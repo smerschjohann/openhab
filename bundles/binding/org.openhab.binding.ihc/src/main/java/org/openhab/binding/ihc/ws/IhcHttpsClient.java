@@ -47,6 +47,7 @@ public abstract class IhcHttpsClient {
 
 	HttpsURLConnection conn = null;
 	private int timeout = 5000;
+	private boolean trustAllCerts = false;
 	
 	/**
 	 * @return the timeout
@@ -60,6 +61,13 @@ public abstract class IhcHttpsClient {
 	 */
 	public void setTimeout(int timeout) {
 		this.timeout = timeout;
+	}
+
+	/**
+	 * @param trustAllCerts Trust all TLS server certificates
+	 */
+	public void setTrustAllCertificates(boolean trustAllCerts) {
+		this.trustAllCerts = trustAllCerts;
 	}
 
 	/**
@@ -92,6 +100,43 @@ public abstract class IhcHttpsClient {
 			}
 		});
 
+		if (trustAllCerts)
+		{
+			// Create a trust manager that does not validate certificate chains,
+			// but accept all.
+			TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+	
+				@Override
+				public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+	
+				@Override
+				public void checkClientTrusted(
+						java.security.cert.X509Certificate[] certs, String authType) {
+				}
+	
+				@Override
+				public void checkServerTrusted(
+						java.security.cert.X509Certificate[] certs, String authType) {
+					logger.trace( "Trusting server cert: " + certs[0].getIssuerDN() );
+				}
+			} };
+	
+			// Install the all-trusting trust manager
+			try {
+				SSLContext sslContext = SSLContext.getInstance("TLS");
+	
+				sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+				conn.setSSLSocketFactory(sslContext.getSocketFactory());
+	
+			} catch (NoSuchAlgorithmException e) {
+				logger.warn("Exception", e);
+			} catch (KeyManagementException e) {
+				logger.warn("Exception", e);
+			}
+		}
+		
 		conn.setUseCaches(false);
 		conn.setDoInput(true);
 		conn.setDoOutput(true);
@@ -124,9 +169,7 @@ public abstract class IhcHttpsClient {
 			@Override
 			public void checkServerTrusted(
 					java.security.cert.X509Certificate[] certs, String authType) {
-				logger.debug( "checkServerTrusted: certs = " +
-				 certs.toString() );
-				 logger.debug( "checkServerTrusted: authType = " + authType );
+				//logger.trace( "checkServerTrusted: cert = " + certs[0].getIssuerDN() );
 			}
 		} };
 

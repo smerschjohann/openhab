@@ -78,7 +78,8 @@ public class IhcClient {
 	private int timeout = 5000; // milliseconds
 	private String projectFile = null;
 	private String dumpResourcesToFile = null;
-
+	private boolean trustAllCerts = false;
+	
 	private Map<Integer, WSResourceValue> resourceValues = new HashMap<Integer, WSResourceValue>();
 	private HashMap<Integer, ArrayList<IhcEnumValue>> enumDictionary = new HashMap<Integer, ArrayList<IhcEnumValue>>();
 	private List<IhcEventListener> eventListeners = new ArrayList<IhcEventListener>();
@@ -145,6 +146,13 @@ public class IhcClient {
 		this.dumpResourcesToFile = value;
 	}
 
+	/**
+	 * @param trustAllCerts Trust all TLS server certificates
+	 */
+	public void setTrustAllCertificates(boolean trustAllCerts) {
+		this.trustAllCerts = trustAllCerts;
+	}
+
 	public synchronized ConnectionState getConnectionState() {
 		return connState;
 	}
@@ -191,6 +199,7 @@ public class IhcClient {
 		setConnectionState(ConnectionState.CONNECTING);
 		
 		authenticationService = new IhcAuthenticationService(ip, timeout);
+		authenticationService.setTrustAllCertificates(trustAllCerts);
 		WSLoginResult loginResult = authenticationService.authenticate(username, password, "treeview");
 
 		if (!loginResult.isLoginWasSuccessful()) {
@@ -218,8 +227,10 @@ public class IhcClient {
 
 		cookies = authenticationService.getCookies();
 		resourceInteractionService = new IhcResourceInteractionService(ip);
+		resourceInteractionService.setTrustAllCertificates(trustAllCerts);
 		resourceInteractionService.setCookies(cookies);
 		controllerService = new IhcControllerService(ip);
+		controllerService.setTrustAllCertificates(trustAllCerts);
 		controllerService.setCookies(cookies);
 		controllerState = controllerService.getControllerState();
 		loadProject();
@@ -354,6 +365,7 @@ public class IhcClient {
 			throws IhcExecption {
 
 		IhcControllerService service = new IhcControllerService(ip);
+		service.setTrustAllCertificates(trustAllCerts);
 		service.setCookies(cookies);
 		return service.waitStateChangeNotifications(previousState, timeoutInSeconds);
 	}
@@ -401,6 +413,7 @@ public class IhcClient {
 			int timeoutInSeconds) throws IhcExecption, SocketTimeoutException {
 
 		IhcResourceInteractionService service = new IhcResourceInteractionService(ip);
+		service.setTrustAllCertificates(trustAllCerts);
 		service.setCookies(cookies);
 
 		List<? extends WSResourceValue> list = service.waitResourceValueNotifications(timeoutInSeconds);

@@ -73,6 +73,9 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	/** Password for controller authentication */
 	private static String password = null;
 
+	/** Trust all controller (TLS server) certificates */
+	private boolean trustAllCerts = false;
+	
 	/**
 	 * Path for IHC / ELKO lS project file, if it's empty/null project is
 	 * download from controller
@@ -153,6 +156,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 					new Object[] { ip, username, "******" });
 
 			ihc = new IhcClient(ip, username, password, timeout);
+			ihc.setTrustAllCertificates(trustAllCerts);
 			ihc.setProjectFile(projectFile);
 			ihc.setDumpResourceInformationToFile(dumpResourceFile);
 			ihc.openConnection();
@@ -343,6 +347,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			timeout = Integer.parseInt((String) config.get("timeout"));
 			projectFile = (String) config.get("projectFile");
 			dumpResourceFile = (String) config.get("dumpResourceFile");
+			trustAllCerts = Boolean.parseBoolean((String) config.get("trustAllCerts"));
 			setProperlyConfigured(true);
 			setReconnectRequest(true);
 		}

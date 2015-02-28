@@ -11,7 +11,11 @@ package org.openhab.binding.ihc.ws;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStreamReader;
+import java.net.CookieHandler;
+import java.net.CookieManager;
 import java.net.SocketTimeoutException;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -19,6 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
@@ -70,7 +80,15 @@ public class IhcClient {
 	private IhcControllerStateListener controllerStateListener = null;
 
 	/** Holds cookie information (session id) from authentication procedure */
-	private static List<String> cookies = null;
+	private CookieManager cookieManager = null;
+
+	/**
+	 * Controller TLS certificate is self signed, which means that certificate
+	 * need to be manually added to java key store as trusted cert. This is
+	 * special SSL context which is configured to trust all certificates and
+	 * manual work is not required.
+	 */
+	private SSLContext sslContext = null;
 
 	private String username = "";
 	private String password = "";
@@ -78,14 +96,12 @@ public class IhcClient {
 	private int timeout = 5000; // milliseconds
 	private String projectFile = null;
 	private String dumpResourcesToFile = null;
-	private boolean trustAllCerts = false;
+	private boolean trustAllCerts = true;
 	
 	private Map<Integer, WSResourceValue> resourceValues = new HashMap<Integer, WSResourceValue>();
 	private HashMap<Integer, ArrayList<IhcEnumValue>> enumDictionary = new HashMap<Integer, ArrayList<IhcEnumValue>>();
 	private List<IhcEventListener> eventListeners = new ArrayList<IhcEventListener>();
 	private WSControllerState controllerState = null;
-
-	List<? extends Integer> resourceIdList = null;
 	
 	public IhcClient(String ip, String username, String password) {
 		this.ip = ip;
@@ -184,6 +200,7 @@ public class IhcClient {
 			controllerStateListener.setInterrupted(true);
 		}
 
+		sslContext = null;
 		setConnectionState(ConnectionState.DISCONNECTED);
 	}
 
@@ -198,8 +215,30 @@ public class IhcClient {
 
 		setConnectionState(ConnectionState.CONNECTING);
 		
+		if (trustAllCerts) {
+			InitSSLContextToTrustAllCerts();
+		}
+		
+		/**
+		 * Controller accepts only HTTPS connections and because normally IP
+		 * address are used on home network rather than DNS names, create host
+		 * name verifier which accepts all host names during TLS handshake.
+		 * 
+		 */
+		HttpsURLConnection.setDefaultHostnameVerifier(new HostnameVerifier() {
+
+			@Override
+			public boolean verify(String arg0, SSLSession arg1) {
+				 logger.trace( "HostnameVerifier: arg0 = " + arg0 );
+				 logger.trace( "HostnameVerifier: arg1 = " + arg1 );
+				return true;
+			}
+		});
+
+		cookieManager = new CookieManager();
+		CookieHandler.setDefault(cookieManager);
+		
 		authenticationService = new IhcAuthenticationService(ip, timeout);
-		authenticationService.setTrustAllCertificates(trustAllCerts);
 		WSLoginResult loginResult = authenticationService.authenticate(username, password, "treeview");
 
 		if (!loginResult.isLoginWasSuccessful()) {
@@ -225,19 +264,53 @@ public class IhcClient {
 
 		logger.debug("Connection successfully opened");
 
-		cookies = authenticationService.getCookies();
 		resourceInteractionService = new IhcResourceInteractionService(ip);
-		resourceInteractionService.setTrustAllCertificates(trustAllCerts);
-		resourceInteractionService.setCookies(cookies);
 		controllerService = new IhcControllerService(ip);
-		controllerService.setTrustAllCertificates(trustAllCerts);
-		controllerService.setCookies(cookies);
 		controllerState = controllerService.getControllerState();
 		loadProject();
 		startIhcListener();
 		setConnectionState(ConnectionState.CONNECTED);
 	}
 
+	public void InitSSLContextToTrustAllCerts() {
+		
+		logger.debug("Initialize SSL context");
+		
+		// Create a trust manager that does not validate certificate chains,
+		// but accept all.
+		TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+
+			@Override
+			public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+				return null;
+			}
+
+			@Override
+			public void checkClientTrusted(
+					java.security.cert.X509Certificate[] certs, String authType) {
+			}
+
+			@Override
+			public void checkServerTrusted(
+					java.security.cert.X509Certificate[] certs, String authType) {
+				logger.trace( "Trusting server cert: " + certs[0].getIssuerDN() );
+			}
+		} };
+
+		// Install the all-trusting trust manager
+		try {
+			sslContext = SSLContext.getInstance("TLS");
+			sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+			SSLContext.setDefault(sslContext);
+			HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
+						
+		} catch (NoSuchAlgorithmException e) {
+			logger.warn("Exception", e);
+		} catch (KeyManagementException e) {
+			logger.warn("Exception", e);
+		}
+	}
+	
 	private void startIhcListener() {
 		logger.debug("startIhcListener");
 		resourceValueNotificationListener = new IhcResourceValueNotificationListener();
@@ -365,8 +438,6 @@ public class IhcClient {
 			throws IhcExecption {
 
 		IhcControllerService service = new IhcControllerService(ip);
-		service.setTrustAllCertificates(trustAllCerts);
-		service.setCookies(cookies);
 		return service.waitStateChangeNotifications(previousState, timeoutInSeconds);
 	}
 
@@ -393,8 +464,6 @@ public class IhcClient {
 			List<? extends Integer> resourceIdList)
 			throws IhcExecption {
 		
-		this.resourceIdList = resourceIdList;
-		
 		resourceInteractionService.enableRuntimeValueNotifications(resourceIdList);
 	}
 
@@ -413,8 +482,6 @@ public class IhcClient {
 			int timeoutInSeconds) throws IhcExecption, SocketTimeoutException {
 
 		IhcResourceInteractionService service = new IhcResourceInteractionService(ip);
-		service.setTrustAllCertificates(trustAllCerts);
-		service.setCookies(cookies);
 
 		List<? extends WSResourceValue> list = service.waitResourceValueNotifications(timeoutInSeconds);
 		

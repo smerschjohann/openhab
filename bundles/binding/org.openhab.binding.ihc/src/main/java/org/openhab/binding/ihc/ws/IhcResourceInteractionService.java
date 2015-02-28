@@ -49,14 +49,9 @@ import org.xml.sax.InputSource;
 public class IhcResourceInteractionService extends IhcHttpsClient {
 	
 	private String url;
-	List<String> cookies;
 	
 	IhcResourceInteractionService(String host) {
 		url = "https://" + host + "/ws/ResourceInteractionService";
-	}
-
-	public void setCookies(List<String> cookies) {
-		this.cookies = cookies;
 	}
 
 	/**
@@ -80,9 +75,7 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 		String query = String.format(soapQuery, String.valueOf(resoureId));
 
 		openConnection(url);
-		super.setCookies(cookies);
 		String response = sendQuery(query);
-		closeConnection();
 
 		NodeList nodeList;
 		try {
@@ -573,7 +566,6 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 			throws IhcExecption {
 
 		openConnection(url);
-		super.setCookies(cookies);
 		String response = sendQuery(query);
 
 		return Boolean.parseBoolean(WSBaseDataType.parseValue(response,
@@ -607,10 +599,8 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 		query += soapQuerySuffix;
 
 		openConnection(url);
-		super.setCookies(cookies);
 		@SuppressWarnings("unused")
 		String response = sendQuery(query);
-		closeConnection();
 	}
 
 	/**
@@ -637,10 +627,8 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 
 		String query = String.format(soapQuery, timeoutInSeconds);
 		openConnection(url);
-		super.setCookies(cookies);
 		setTimeout(getTimeout() + timeoutInSeconds * 1000);
 		String response = sendQuery(query);
-		closeConnection();
 		
 		List<WSResourceValue> resourceValueList = new ArrayList<WSResourceValue>();
 

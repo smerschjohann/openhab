@@ -15,17 +15,9 @@ import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.util.List;
 import java.util.Map;
 
-import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,9 +37,8 @@ public abstract class IhcHttpsClient {
 	private static final Logger logger = LoggerFactory
 			.getLogger(IhcHttpsClient.class);
 
-	HttpsURLConnection conn = null;
+	private HttpsURLConnection conn = null;
 	private int timeout = 5000;
-	private boolean trustAllCerts = false;
 	
 	/**
 	 * @return the timeout
@@ -64,13 +55,6 @@ public abstract class IhcHttpsClient {
 	}
 
 	/**
-	 * @param trustAllCerts Trust all TLS server certificates
-	 */
-	public void setTrustAllCertificates(boolean trustAllCerts) {
-		this.trustAllCerts = trustAllCerts;
-	}
-
-	/**
 	 * Open HTTP connection.
 	 * 
 	 * @param url
@@ -78,9 +62,6 @@ public abstract class IhcHttpsClient {
 	 */
 	protected void openConnection(String url)
 			throws IhcExecption {
-
-		// For debugging purposes
-		//System.setProperty("javax.net.debug","all");
 
 		try {
 			conn = (HttpsURLConnection) new URL(url).openConnection();
@@ -90,53 +71,6 @@ public abstract class IhcHttpsClient {
 			throw new IhcExecption(e);
 		}
 
-		conn.setHostnameVerifier(new HostnameVerifier() {
-
-			@Override
-			public boolean verify(String arg0, SSLSession arg1) {
-				 logger.trace( "HostnameVerifier: arg0 = " + arg0 );
-				 logger.trace( "HostnameVerifier: arg1 = " + arg1 );
-				return true;
-			}
-		});
-
-		if (trustAllCerts)
-		{
-			// Create a trust manager that does not validate certificate chains,
-			// but accept all.
-			TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
-	
-				@Override
-				public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-					return null;
-				}
-	
-				@Override
-				public void checkClientTrusted(
-						java.security.cert.X509Certificate[] certs, String authType) {
-				}
-	
-				@Override
-				public void checkServerTrusted(
-						java.security.cert.X509Certificate[] certs, String authType) {
-					logger.trace( "Trusting server cert: " + certs[0].getIssuerDN() );
-				}
-			} };
-	
-			// Install the all-trusting trust manager
-			try {
-				SSLContext sslContext = SSLContext.getInstance("TLS");
-	
-				sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-				conn.setSSLSocketFactory(sslContext.getSocketFactory());
-	
-			} catch (NoSuchAlgorithmException e) {
-				logger.warn("Exception", e);
-			} catch (KeyManagementException e) {
-				logger.warn("Exception", e);
-			}
-		}
-		
 		conn.setUseCaches(false);
 		conn.setDoInput(true);
 		conn.setDoOutput(true);
@@ -146,50 +80,9 @@ public abstract class IhcHttpsClient {
 	}
 
 	protected void closeConnection() {
-		//conn.disconnect();
+		conn.disconnect();
 	}
 	
-	@SuppressWarnings("unused")
-	private void trustEveryone() {
-
-		// Create a trust manager that does not validate certificate chains,
-		// but accept all.
-		TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
-
-			@Override
-			public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-				return null;
-			}
-
-			@Override
-			public void checkClientTrusted(
-					java.security.cert.X509Certificate[] certs, String authType) {
-			}
-
-			@Override
-			public void checkServerTrusted(
-					java.security.cert.X509Certificate[] certs, String authType) {
-				//logger.trace( "checkServerTrusted: cert = " + certs[0].getIssuerDN() );
-			}
-		} };
-
-		// Install the all-trusting trust manager
-		try {
-			SSLContext sslContext = SSLContext.getInstance("TLS");
-
-			sslContext.init(null, trustAllCerts,
-					new java.security.SecureRandom());
-			HttpsURLConnection.setDefaultSSLSocketFactory(sslContext
-					.getSocketFactory());
-
-		} catch (NoSuchAlgorithmException e) {
-			logger.warn("Exception", e);
-		} catch (KeyManagementException e) {
-			logger.warn("Exception", e);
-		}
-
-	}
-
 	/**
 	 * Send HTTP request and wait response from the server.
 	 * 
@@ -223,29 +116,6 @@ public abstract class IhcHttpsClient {
 			throw new IhcExecption(e);
 		} catch (IOException e) {
 			throw new IhcExecption(e);
-		}
-	}
-
-	/**
-	 * Get cookies values from last response.
-	 * 
-	 * @return List of cookie values.
-	 */
-	public List<String> getCookies() {
-		return conn.getHeaderFields().get("set-cookie");
-	}
-
-	/**
-	 * Set cookie values to use in next query.
-	 * 
-	 * @param cookies
-	 *            List of cookie values.
-	 * @return
-	 */
-	public void setCookies(List<String> cookies) {
-		for (String cookie : cookies) {
-			logger.trace("Use cookie value '{}'", cookie.split(";", 2)[0]);
-			conn.addRequestProperty("Cookie", cookie.split(";", 2)[0]);
 		}
 	}
 

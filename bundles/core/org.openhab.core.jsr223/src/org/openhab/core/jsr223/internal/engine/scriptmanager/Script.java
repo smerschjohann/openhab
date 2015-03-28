@@ -1,0 +1,105 @@
+package org.openhab.core.jsr223.internal.engine.scriptmanager;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.script.Invocable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+
+import org.openhab.core.jsr223.internal.engine.RuleExecutionRunnable;
+import org.openhab.core.jsr223.internal.shared.ChangedEventTrigger;
+import org.openhab.core.jsr223.internal.shared.CommandEventTrigger;
+import org.openhab.core.jsr223.internal.shared.Event;
+import org.openhab.core.jsr223.internal.shared.EventTrigger;
+import org.openhab.core.jsr223.internal.shared.Openhab;
+import org.openhab.core.jsr223.internal.shared.Rule;
+import org.openhab.core.jsr223.internal.shared.RuleSet;
+import org.openhab.core.jsr223.internal.shared.ShutdownTrigger;
+import org.openhab.core.jsr223.internal.shared.StartupTrigger;
+import org.openhab.core.jsr223.internal.shared.TimerTrigger;
+import org.openhab.core.jsr223.internal.shared.TriggerType;
+import org.openhab.core.types.Command;
+import org.openhab.core.types.State;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class Script {
+	static private final Logger logger = LoggerFactory.getLogger(Script.class);
+	ArrayList<Rule> rules = new ArrayList<Rule>();
+	private ScriptManager scriptManager;
+	private ScriptEngine engine;
+	private String fileName;
+	
+	
+	
+	public Script(ScriptManager scriptManager, File file) throws FileNotFoundException, ScriptException {
+		this.scriptManager = scriptManager;
+		this.fileName = file.getName();
+		loadScript(file);
+	}
+	
+	public void loadScript(File file) throws FileNotFoundException, ScriptException {
+		logger.info("Loading Script "+ file.getName());
+		String extension = getFileExtension(file); 
+		
+		ScriptEngineManager factory = new ScriptEngineManager();
+		
+		
+        engine = factory.getEngineByExtension(extension);
+        if(engine != null) {   
+        	try {
+        		engine.put("RuleSet", RuleSet.class);
+        		engine.put("Rule", Rule.class);
+		        engine.put("State", State.class);
+		        engine.put("Command", Command.class);
+		        engine.put("ChangedEventTrigger", ChangedEventTrigger.class);
+		        engine.put("CommandEventTrigger", CommandEventTrigger.class);
+		        engine.put("Event", Event.class);
+		        engine.put("EventTrigger", EventTrigger.class);
+		        engine.put("ShutdownTrigger", ShutdownTrigger.class);
+		        engine.put("StartupTrigger", StartupTrigger.class);
+		        engine.put("TimerTrigger", TimerTrigger.class);
+		        engine.put("TriggerType", TriggerType.class);
+		        engine.put("ItemRegistry", scriptManager.getItemRegistry());
+		        engine.put("oh", Openhab.class);
+		        
+		        engine.eval(new FileReader(file));
+		        
+		        Invocable inv = (Invocable) engine;
+		        RuleSet ruleSet = (RuleSet) inv.invokeFunction("getRules");
+
+		        rules.addAll(ruleSet.getRules());
+        	} catch(Exception e) {
+        		logger.error("error loading script "+file.getName(), e);
+        	}
+        }
+    }
+
+	private String getFileExtension(File file) {
+		String extension = "py";
+		if(file.getName().contains(".")) {
+			String name = file.getName();
+			extension = name.substring(name.lastIndexOf('.')+1,name.length());
+		}
+		return extension;
+	}
+	
+	public List<Rule> getRules() {
+		return this.rules;
+	}
+		
+	public void executeRule(Rule rule, Event event) {
+		Thread t = new Thread(new RuleExecutionRunnable(rule, event));
+		t.start();
+	}
+
+	public String getFileName() {
+		return fileName;
+	}	
+}

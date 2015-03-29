@@ -10,6 +10,7 @@ package org.openhab.binding.ihc;
 
 import org.openhab.core.binding.BindingProvider;
 import org.openhab.core.items.Item;
+import org.openhab.core.types.Command;
 
 /**
  * This interface is implemented by classes that can provide mapping information
@@ -32,14 +33,16 @@ public interface IhcBindingProvider extends BindingProvider {
 	Class<? extends Item> getItemType(String itemName);
 	
 	/**
-	 * Returns the resource id to the given <code>itemName</code>.
+	 * Returns the resource id to the given <code>itemName</code> and <code>cmd</code>
 	 * 
 	 * @param itemName
 	 *            the item for which to find a resource id.
+	 * @param cmd
+	 * 			  the wanted command, choose null for wildcard.
 	 * 
 	 * @return the corresponding Resource Id to the given <code>itemName</code>.
-	 */
-	public int getResourceId(String itemName);
+	 */	
+	public int getResourceId(String itemName, Command cmd);
 
 	/**
 	 * Returns the refresh interval to the given <code>itemName</code>. Is used
@@ -62,5 +65,13 @@ public interface IhcBindingProvider extends BindingProvider {
 	 * @return true if item is out binding only.
 	 */
 	public boolean isOutBindingOnly(String itemName);
-
+	
+	/**
+	 * Returns the value which is configured for the given item and the command
+	 * 
+	 * @param itemName
+	 * @param cmd
+	 * @return
+	 */
+	public Integer getValue(String itemName, Command cmd);
 }

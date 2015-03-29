@@ -29,6 +29,7 @@ import org.openhab.core.binding.AbstractActiveBinding;
 import org.openhab.core.binding.BindingChangeListener;
 import org.openhab.core.binding.BindingProvider;
 import org.openhab.core.items.Item;
+import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
 import org.openhab.core.types.Type;
@@ -112,7 +113,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	}
 
 	public void deactivate(ComponentContext componentContext) {
-		discnnect();
+		disconnect();
 	}
 	
 	protected boolean isReconnectRequestActivated() {
@@ -170,7 +171,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	 * Disconnect connection to IHC / ELKO LS controller.
 	 * 
 	 */
-	public void discnnect() {
+	public void disconnect() {
 		if (ihc != null) {
 			try {
 				ihc.removeEventListener(this);
@@ -191,7 +192,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 
 			try {
 				if (ihc != null) {
-					discnnect();
+					disconnect();
 				}
 				connect();
 				setReconnectRequest(false);
@@ -216,7 +217,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			for (IhcBindingProvider provider : providers) {
 				for (String itemName : provider.getItemNames()) {
 
-					int resourceId = provider.getResourceId(itemName);
+					int resourceId = provider.getResourceId(itemName, null);
 					int itemRefreshInterval = provider
 							.getRefreshInterval(itemName) * 1000;
 
@@ -364,13 +365,15 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	private void updateResource(String itemName, Type type, boolean updateOnlyOutBinding) {
 		
 		if (itemName != null) {
-
-			IhcBindingProvider provider = findFirstMatchingBindingProvider(itemName);
+			Command cmd = null;
+			try {
+				 cmd = (Command) type;
+			} catch(Exception e) {};
+			
+			IhcBindingProvider provider = findFirstMatchingBindingProvider(itemName, cmd);
 
 			if (provider == null) {
-				logger.warn(
-						"Doesn't find matching binding provider [itemName={}]",
-						itemName);
+				//command not configured, skip
 				return;
 			}
 
@@ -396,28 +399,79 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			
 			try {
 
-				int resourceId = provider.getResourceId(itemName);
-				WSResourceValue value = ihc
-						.getResourceValueInformation(resourceId);
+				int resourceId = provider.getResourceId(itemName, (Command)type);
+				logger.trace(
+						"found resourceId {} (item='{}', state='{}', class='{}')",
+						new Object[] { new Integer(resourceId).toString(), itemName, type.toString(),
+								type.getClass().toString() });
+				if(resourceId > 0) {
 				
-				ArrayList<IhcEnumValue> enumValues = null;
+					WSResourceValue value = ihc
+							.getResourceValueInformation(resourceId);
+					
+					ArrayList<IhcEnumValue> enumValues = null;
+	
+					if (value instanceof WSEnumValue) {
+	
+						enumValues = ihc.getEnumValues(((WSEnumValue) value)
+								.getDefinitionTypeID());
+					}
+	
+					Integer val = provider.getValue(itemName, (Command)type);
+					boolean trigger = false;
+					if(val != null) {
+						if(val == 0) {
+							type = OnOffType.OFF;
+						} else if(val == 1) {
+							type = OnOffType.ON;
+						} else {
+							trigger = true;
+						}
+					}
+					
+					if (!trigger) {
+						value = IhcDataConverter.convertCommandToResourceValue(type, value,
+								enumValues);
 
-				if (value instanceof WSEnumValue) {
-
-					enumValues = ihc.getEnumValues(((WSEnumValue) value)
-							.getDefinitionTypeID());
-				}
-
-				value = IhcDataConverter.convertCommandToResourceValue(type, value,
-						enumValues);
-
-				boolean result = updateResource(value);
+						boolean result = updateResource(value);
+						
+						if (result == true) {
+							logger.debug("Item updated '{}' succesfully sent",
+									itemName);
+						} else {
+							logger.error("Item '{}' update failed", itemName);
+						}
+					} else {
+						value = IhcDataConverter.convertCommandToResourceValue(OnOffType.ON, value,
+								enumValues);
+		
+						boolean result = updateResource(value);
+						
+						if (result == true) {
+							logger.debug("Item '{}' trigger started",
+									itemName);
+							
+							Thread.sleep(val);
+			
+							value = IhcDataConverter.convertCommandToResourceValue(OnOffType.OFF, value,
+									enumValues);
+			
+							result = updateResource(value);
+							
+							if (result == true) {
+								logger.debug("Item '{}' trigger completed",
+										itemName);
+							} else {
+								logger.error("Item '{}' trigger stop failed", itemName);
+							}
+							
+						} else {
+							logger.error("Item '{}' update failed", itemName);
+						}
+					}
 				
-				if (result == true) {
-					logger.debug("Item updated '{}' succesfully sent",
-							itemName);
 				} else {
-					logger.error("Item '{}' update failed", itemName);
+					logger.error("resourceId invalid");
 				}
 
 			} catch ( IhcExecption e) {
@@ -460,15 +514,12 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	 * @return the matching binding provider or <code>null</code> if no binding
 	 *         provider could be found
 	 */
-	private IhcBindingProvider findFirstMatchingBindingProvider(String itemName) {
-
+	private IhcBindingProvider findFirstMatchingBindingProvider(String itemName, Command type) {
 		IhcBindingProvider firstMatchingProvider = null;
 
 		for (IhcBindingProvider provider : this.providers) {
-
-			int resourceId = provider.getResourceId(itemName);
-
-			if (resourceId > 0) {
+			if (provider.getResourceId(itemName, type) > 0 ||
+					provider.getResourceId(itemName, null) > 0) {
 				firstMatchingProvider = provider;
 				break;
 			}
@@ -496,7 +547,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			
 			for (IhcBindingProvider provider : providers) {
 				for (String itemName : provider.getItemNames()) {
-					resourceIdList.add(provider.getResourceId(itemName));
+					resourceIdList.add(provider.getResourceId(itemName, null));
 				}
 			}
 
@@ -552,7 +603,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 		for (IhcBindingProvider provider : providers) {
 			for (String itemName : provider.getItemNames()) {
 
-				int resourceId = provider.getResourceId(itemName);
+				int resourceId = provider.getResourceId(itemName, null);
 
 				if (value.getResourceID() == resourceId) {
 

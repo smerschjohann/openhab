@@ -8,6 +8,11 @@
  */
 package org.openhab.binding.ihc.internal;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.openhab.binding.ihc.IhcBindingProvider;
 import org.openhab.core.autoupdate.AutoUpdateBindingProvider;
 import org.openhab.core.binding.BindingConfig;
@@ -19,6 +24,8 @@ import org.openhab.core.library.items.NumberItem;
 import org.openhab.core.library.items.RollershutterItem;
 import org.openhab.core.library.items.StringItem;
 import org.openhab.core.library.items.SwitchItem;
+import org.openhab.core.types.Command;
+import org.openhab.core.types.TypeParser;
 import org.openhab.model.item.binding.AbstractGenericBindingProvider;
 import org.openhab.model.item.binding.BindingConfigParseException;
 import org.slf4j.Logger;
@@ -87,49 +94,91 @@ public class IhcGenericBindingProvider extends AbstractGenericBindingProvider
 
 		IhcBindingConfig config = new IhcBindingConfig();
 		config.itemType = item.getClass();
+		config.outBindingOnly = true;
+		config.outCommandMap = new HashMap<Command, IhcOutCommandConfig>();
 		
-		String[] configParts = bindingConfig.trim().split(":");
-
-		if (configParts.length > 2) {
-			throw new BindingConfigParseException(
-					"IHC / ELKO LS binding must contain of max two two parts separated by ':'");
-		}
-
-		if (bindingConfig.startsWith(">")) {
-
-			if (configParts.length == 1) {
-				config.outBindingOnly = true;
-				String resourceId = configParts[0].replace(">", "");
-
-				if (resourceId.startsWith("0x")) {
-					config.resourceId = Integer.parseInt(
-							resourceId.replace("0x", ""), 16);
-				} else {
-					config.resourceId = Integer.parseInt(resourceId);
+		String[] splittedCommands = bindingConfig.split(",");
+		
+		for(String split : splittedCommands) {
+			if (split.startsWith(">")) {
+				try {
+					//out binding
+					String resourceCommand = split.substring(1);
+					
+					final String commandRegex = "\\[([\\w*]+):(0x[0-9a-fA-F]+|\\d+)(?::(\\d+)){0,1}\\]"; 
+					Pattern p = Pattern.compile(commandRegex);
+					Matcher m = p.matcher(resourceCommand);
+	
+					IhcOutCommandConfig outConfig = new IhcOutCommandConfig();
+					
+					if(!m.matches()) {
+						if(splittedCommands.length < 2) {
+							//assume old style out command
+							outConfig.command = null; //wildcard
+							outConfig.resourceId = getResourceIdFromString(resourceCommand);
+												
+						} else {
+							throw new BindingConfigParseException(
+									"Item '"
+											+ item.getName()
+											+ "' has invalid out binding config");
+						}
+					} else {
+						//new style out binding
+						Command command = TypeParser.parseCommand(
+								item.getAcceptedCommandTypes(), m.group(1));
+	
+						if(command == null && m.group(0) != "*") {
+							throw new BindingConfigParseException(
+									"Item '"
+											+ item.getName()
+											+ " invalid Command: "+ m.group(1));
+						}
+						
+						outConfig.command = command;
+						outConfig.resourceId = getResourceIdFromString(m.group(2));
+						
+						if(m.groupCount() == 3 && m.group(3) != null) {
+							outConfig.value = Integer.parseInt(m.group(3));
+						}
+					}
+					
+					config.outCommandMap.put(outConfig.command, outConfig);
 				}
-				
+				catch(Exception e) {
+					logger.warn("Error in output config for item: "+ item.getName(), e);
+				}
 			} else {
-				throw new BindingConfigParseException(
-						"When configuration start with '>', refresh interval is not supported ");
+				if(splittedCommands.length < 2) {
+					String[] configParts = bindingConfig.trim().split(":");
+		
+					String resourceId = configParts[0];
+					config.resourceId = getResourceIdFromString(resourceId);
+					config.outBindingOnly = false;
+					config.outCommandMap = null;
+					
+					if (configParts.length == 2)
+						config.refreshInterval = Integer.parseInt(configParts[1]);
+				} else {
+					throw new BindingConfigParseException("Only out binding or normal binding supported at this time");
+				}
 			}
-
-		} else {
-
-			String resourceId = configParts[0];
-
-			if (resourceId.startsWith("0x")) {
-				config.resourceId = Integer.parseInt(
-						resourceId.replace("0x", ""), 16);
-			} else {
-				config.resourceId = Integer.parseInt(resourceId);
-			}
-
-			if (configParts.length == 2)
-				config.refreshInterval = Integer.parseInt(configParts[1]);
-
 		}
 
 		addBindingConfig(item, config);
+	}
+	
+	private int getResourceIdFromString(String resourceId) {
+		int ret = 0;
+		
+		if (resourceId.startsWith("0x")) {
+			ret = Integer.parseInt(
+					resourceId.replace("0x", ""), 16);
+		} else {
+			ret = Integer.parseInt(resourceId);
+		}
+		
+		return ret;
 	}
 
 	/**
@@ -143,8 +192,17 @@ public class IhcGenericBindingProvider extends AbstractGenericBindingProvider
 		public int resourceId;
 		public int refreshInterval;
 		public boolean outBindingOnly;
+		
+		public HashMap<Command, IhcOutCommandConfig> outCommandMap;
 	}
 
+	static private class IhcOutCommandConfig {
+		public Command command;		
+		public Integer resourceId;
+		
+		public Integer value; // used if it is a function
+	}
+	
 	/**
 	 * @{inheritDoc}
 	 */
@@ -153,12 +211,28 @@ public class IhcGenericBindingProvider extends AbstractGenericBindingProvider
 		IhcBindingConfig config = (IhcBindingConfig) bindingConfigs.get(itemName);
 		return config != null ? config.itemType : null;
 	}
-	
+		
 	@Override
-	public int getResourceId(String itemName) {
+	public int getResourceId(String itemName, Command cmd) {
+		int result = 0;
+		
 		IhcBindingConfig config = (IhcBindingConfig) bindingConfigs
 				.get(itemName);
-		return config != null ? config.resourceId : null;
+		if(config != null) {
+			result = config.resourceId;
+			if(config.outBindingOnly) {
+				IhcOutCommandConfig outConfig = config.outCommandMap.get(cmd);
+				if(outConfig != null)
+					result = outConfig.resourceId;
+				else {
+					outConfig = config.outCommandMap.get(null);
+					if(outConfig != null)
+						result = outConfig.resourceId;
+				}
+			}
+		}
+		
+		return result;
 	}
 
 	@Override
@@ -213,4 +287,24 @@ public class IhcGenericBindingProvider extends AbstractGenericBindingProvider
 		return null;
 	}
 
+	@Override
+	public Integer getValue(String itemName, Command cmd) {
+		IhcBindingConfig config = (IhcBindingConfig) bindingConfigs
+				.get(itemName);
+		
+		IhcOutCommandConfig outConfig = (config != null && config.outCommandMap != null) ? config.outCommandMap.get(cmd) : null;
+		if(outConfig == null)
+			outConfig = (config != null && config.outCommandMap != null) ? config.outCommandMap.get(null) : null;
+			
+		return (outConfig != null) ? outConfig.value : null;
+	}
+	
+	
+	public static void main(String[] args) throws BindingConfigParseException {
+		IhcGenericBindingProvider provider = new IhcGenericBindingProvider();
+		
+		provider.processBindingConfiguration(null, new RollershutterItem("Roller"), ">[UP:1234:100],>[DOWN:1241:100]");
+		
+		
+	}
 }

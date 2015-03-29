@@ -298,13 +298,4 @@ public class IhcGenericBindingProvider extends AbstractGenericBindingProvider
 			
 		return (outConfig != null) ? outConfig.value : null;
 	}
-	
-	
-	public static void main(String[] args) throws BindingConfigParseException {
-		IhcGenericBindingProvider provider = new IhcGenericBindingProvider();
-		
-		provider.processBindingConfiguration(null, new RollershutterItem("Roller"), ">[UP:1234:100],>[DOWN:1241:100]");
-		
-		
-	}
 }

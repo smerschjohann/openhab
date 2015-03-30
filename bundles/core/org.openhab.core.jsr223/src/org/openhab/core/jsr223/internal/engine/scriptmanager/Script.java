@@ -24,6 +24,17 @@ import org.openhab.core.jsr223.internal.shared.ShutdownTrigger;
 import org.openhab.core.jsr223.internal.shared.StartupTrigger;
 import org.openhab.core.jsr223.internal.shared.TimerTrigger;
 import org.openhab.core.jsr223.internal.shared.TriggerType;
+import org.openhab.core.library.types.DateTimeType;
+import org.openhab.core.library.types.DecimalType;
+import org.openhab.core.library.types.HSBType;
+import org.openhab.core.library.types.IncreaseDecreaseType;
+import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.OpenClosedType;
+import org.openhab.core.library.types.PercentType;
+import org.openhab.core.library.types.PointType;
+import org.openhab.core.library.types.StopMoveType;
+import org.openhab.core.library.types.StringType;
+import org.openhab.core.library.types.UpDownType;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
 import org.slf4j.Logger;
@@ -35,8 +46,6 @@ public class Script {
 	private ScriptManager scriptManager;
 	private ScriptEngine engine;
 	private String fileName;
-	
-	
 	
 	public Script(ScriptManager scriptManager, File file) throws FileNotFoundException, ScriptException {
 		this.scriptManager = scriptManager;
@@ -67,7 +76,21 @@ public class Script {
 		        engine.put("TimerTrigger", TimerTrigger.class);
 		        engine.put("TriggerType", TriggerType.class);
 		        engine.put("ItemRegistry", scriptManager.getItemRegistry());
+		        engine.put("DateTime", org.joda.time.DateTime.class);
 		        engine.put("oh", Openhab.class);
+		        
+		        //default types, TODO: auto import would be nice
+		        engine.put("DateTimeType", DateTimeType.class);
+		        engine.put("DecimalType", DecimalType.class);
+		        engine.put("HSBType", HSBType.class);
+		        engine.put("IncreaseDecreaseType", IncreaseDecreaseType.class);
+		        engine.put("OnOffType", OnOffType.class);
+		        engine.put("OpenClosedType", OpenClosedType.class);
+		        engine.put("PercentType", PercentType.class);
+		        engine.put("PointType", PointType.class);
+		        engine.put("StopMoveType", StopMoveType.class);
+		        engine.put("UpDownType", UpDownType.class);
+		        engine.put("StringType", StringType.class);
 		        
 		        engine.eval(new FileReader(file));
 		        
@@ -82,7 +105,7 @@ public class Script {
     }
 
 	private String getFileExtension(File file) {
-		String extension = "py";
+		String extension = null;
 		if(file.getName().contains(".")) {
 			String name = file.getName();
 			extension = name.substring(name.lastIndexOf('.')+1,name.length());

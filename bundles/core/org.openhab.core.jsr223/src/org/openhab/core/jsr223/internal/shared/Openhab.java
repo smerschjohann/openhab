@@ -1,16 +1,30 @@
 package org.openhab.core.jsr223.internal.shared;
 
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.TriggerBuilder.newTrigger;
+
 import java.util.HashMap;
 
+import org.joda.time.base.AbstractInstant;
 import org.openhab.core.jsr223.internal.Jsr223CoreActivator;
+import org.openhab.core.jsr223.internal.actions.TimerExecutionJob;
+import org.openhab.core.jsr223.internal.actions.TimerImpl;
 import org.openhab.core.scriptengine.action.ActionService;
 
 
 import org.openhab.model.script.actions.BusEvent;
+import org.openhab.model.script.actions.Timer;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+import org.quartz.JobKey;
+import org.quartz.SchedulerException;
+import org.quartz.Trigger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Openhab extends BusEvent {
+	private static final Logger logger = LoggerFactory.getLogger(Openhab.class);
+
 	private static String LOGGER_NAME_PREFIX = "org.openhab.model.jsr232.";
 
 	/**
@@ -43,6 +57,10 @@ public class Openhab extends BusEvent {
 	 */
 	public static Object getAction(String action) {
 		return getActions().get(action);
+	}
+	
+	public static Logger getLogger(String loggerName) {
+		return LoggerFactory.getLogger(LOGGER_NAME_PREFIX.concat(loggerName));
 	}
 	
 	/**
@@ -103,5 +121,30 @@ public class Openhab extends BusEvent {
 	 */
 	static public void logError(String loggerName, String format, Object... args) {
 		LoggerFactory.getLogger(LOGGER_NAME_PREFIX.concat(loggerName)).error(format, args);
+	}
+	
+	public static Timer createTimer(AbstractInstant instant, Runnable closure) {
+		JobDataMap dataMap = new JobDataMap();
+		dataMap.put("procedure", closure);
+		return makeTimer(instant, closure.toString(), dataMap);
+	}
+	
+	private static Timer makeTimer(AbstractInstant instant, String closure, JobDataMap dataMap) {
+		JobKey jobKey = new JobKey(instant.toString() + ": " + closure.toString());
+        Trigger trigger = newTrigger().startAt(instant.toDate()).build();
+		TimerImpl timer = new TimerImpl(jobKey, trigger.getKey(), instant);
+		dataMap.put("timer", timer);
+		try {
+	        JobDetail job = newJob(TimerExecutionJob.class)
+	            .withIdentity(jobKey)
+	            .usingJobData(dataMap)
+	            .build();	
+	        TimerImpl.scheduler.scheduleJob(job, trigger);
+			logger.debug("Scheduled code for execution at {}", instant.toString());
+			return timer;
+		} catch(SchedulerException e) {
+			logger.error("Failed to schedule code for execution.", e);
+			return null;
+		}		
 	}
 }

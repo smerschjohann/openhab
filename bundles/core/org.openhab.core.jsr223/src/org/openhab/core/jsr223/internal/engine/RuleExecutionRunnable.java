@@ -22,7 +22,7 @@ public class RuleExecutionRunnable implements Runnable {
 			this.rule.execute(event);
 		}
 		catch(Exception e) {
-			logger.error("Error while executing rule: "+rule.getName(), e);
+			logger.error("Error while executing rule: "+rule, e);
 		}
 	}
 

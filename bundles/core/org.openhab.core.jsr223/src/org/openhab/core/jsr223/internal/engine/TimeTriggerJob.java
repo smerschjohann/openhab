@@ -14,18 +14,20 @@ import org.slf4j.LoggerFactory;
 public class TimeTriggerJob implements Job {
 
 	private static final Logger logger = LoggerFactory.getLogger(TimeTriggerJob.class);
+	private Rule rule;
 		
 	@Override
 	public void execute(JobExecutionContext context) throws JobExecutionException {
-		String ruleName = (String) context.getJobDetail().getJobDataMap().get(RuleTriggerManager.RULE_NAME);				
-		String scriptName = (String) context.getJobDetail().getJobDataMap().get(RuleTriggerManager.SCRIPT_FILE);
-		
-		logger.info("TimeTrigger for rule: "+ ruleName + ", scriptName: "+scriptName);
+		String scriptName = ScriptManager.getInstance().getScript(rule).getFileName();
+		logger.info("TimeTrigger for rule: "+ rule + ", scriptName: "+scriptName);
 		
 		ScriptManager manager = ScriptManager.getInstance();
-		Rule rule = manager.getRule(scriptName, ruleName);
 		
 		manager.executeRules(new Rule[] { rule }, new Event(TriggerType.TIMER, null, null, null, null));
+	}
+	
+	public void setRule(Rule rule) {
+		this.rule = rule;
 	}
 
 }

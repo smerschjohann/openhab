@@ -104,22 +104,6 @@ public class ScriptManager {
 	public void setItemRegistry(ItemRegistry itemRegistry) {
 		this.itemRegistry = itemRegistry;
 	}
-		
-	public Rule getRule(String scriptName, String ruleName) {
-		Rule ret = null;
-		
-		Script script = scripts.get(scriptName);
-		
-		if(script != null) {
-			for(Rule rule : script.getRules()) {
-				if(rule.getName() == ruleName) {
-					ret = rule;
-				}
-			}
-		}
-		
-		return ret;
-	}
 	
 	public synchronized void executeRules(Rule[] rules, org.openhab.core.jsr223.internal.shared.Event event) {
 		for(Rule rule : rules) {

@@ -34,6 +34,7 @@ import org.openhab.core.types.State;
 import org.openhab.core.types.Type;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.Job;
+import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
@@ -240,7 +241,7 @@ public class RuleTriggerManager {
 				try {
 					createTimer(rule, (TimerTrigger) t);
 				} catch (SchedulerException e) {
-					logger.error("Cannot create timer for rule '{}': {}", rule.getName(), e.getMessage());
+					logger.error("Cannot create timer for rule '{}': {}", rule, e.getMessage());
 				}
 			}
 		}
@@ -305,7 +306,7 @@ public class RuleTriggerManager {
 		try {
 			removeTimer(rule);
 		} catch (SchedulerException e) {
-			logger.error("Cannot remove timer for rule '{}'", rule.getName(), e);
+			logger.error("Cannot remove timer for rule '{}'", rule, e);
 		}						
 	}
 	
@@ -327,16 +328,17 @@ public class RuleTriggerManager {
 				cronExpression = "0 0 0 * * ?";
 			} 
 		} else {
-			logger.warn("Unrecognized time expression '{}' in rule '{}'", trigger.getCron(), rule.getName());
+			logger.warn("Unrecognized time expression '{}' in rule '{}'", trigger.getCron(), rule);
 			return;
 		}
 		
 		String jobIdentity = getJobIdentityString(rule, trigger);
 
 		try {
+			JobDataMap dataMap = new JobDataMap();
+			dataMap.put("rule", rule);
 	        JobDetail job = newJob(TimeTriggerJob.class)
-	        		.usingJobData(RULE_NAME, rule.getName())
-	        		.usingJobData(SCRIPT_FILE, ScriptManager.getInstance().getScript(rule).getFileName())
+	        		.usingJobData(dataMap)
 	            .withIdentity(jobIdentity)
 	            .build();
 	        Trigger quartzTrigger = newTrigger()
@@ -345,7 +347,7 @@ public class RuleTriggerManager {
 
 	        scheduler.scheduleJob(job, quartzTrigger);
 
-			logger.debug("Scheduled rule {} with cron expression {}", rule.getName(), cronExpression);
+			logger.debug("Scheduled rule {} with cron expression {}", rule, cronExpression);
 		} catch (RuntimeException e) {
 			throw new SchedulerException(e.getMessage());
 		}
@@ -375,7 +377,7 @@ public class RuleTriggerManager {
 	
 	private String getJobIdentityString(Rule rule, TimerTrigger trigger) {
 		Script script = ScriptManager.getInstance().getScript(rule);
-		String jobIdentity = script.getFileName() + "#" + rule.getName();
+		String jobIdentity = script.getFileName() + "#" + rule;
 		if (trigger != null) {
 			if (trigger.getCron() != null ) {
 				jobIdentity += "#" + trigger.getCron();

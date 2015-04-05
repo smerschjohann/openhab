@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2014, openHAB.org and others.
+ * Copyright (c) 2010-2015, openHAB.org and others.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -34,7 +34,7 @@ public class IhcAuthenticationService extends IhcHttpsClient {
 
 	IhcAuthenticationService(String host, int timeout) {
 		this(host);
-		super.setTimeout(timeout);
+		super.setRequestTimeout(timeout);
 	}
 	
 	public WSLoginResult authenticate(String username, String password, String application) throws IhcExecption {

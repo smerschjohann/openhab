@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2014, openHAB.org and others.
+ * Copyright (c) 2010-2015, openHAB.org and others.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -76,6 +76,7 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 
 		openConnection(url);
 		String response = sendQuery(query);
+		closeConnection();
 
 		NodeList nodeList;
 		try {
@@ -567,6 +568,7 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 
 		openConnection(url);
 		String response = sendQuery(query);
+		closeConnection();
 
 		return Boolean.parseBoolean(WSBaseDataType.parseValue(response,
 				"/SOAP-ENV:Envelope/SOAP-ENV:Body/ns1:setResourceValue2"));
@@ -601,6 +603,7 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 		openConnection(url);
 		@SuppressWarnings("unused")
 		String response = sendQuery(query);
+		closeConnection();
 	}
 
 	/**
@@ -627,8 +630,9 @@ public class IhcResourceInteractionService extends IhcHttpsClient {
 
 		String query = String.format(soapQuery, timeoutInSeconds);
 		openConnection(url);
-		setTimeout(getTimeout() + timeoutInSeconds * 1000);
+		setRequestTimeout(getRequestTimeout() + timeoutInSeconds * 1000);
 		String response = sendQuery(query);
+		closeConnection();
 		
 		List<WSResourceValue> resourceValueList = new ArrayList<WSResourceValue>();
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2014, openHAB.org and others.
+ * Copyright (c) 2010-2015, openHAB.org and others.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -47,6 +47,7 @@ public class IhcControllerService extends IhcHttpsClient {
 		openConnection(url);
 		setRequestProperty("SOAPAction", "getProjectInfo");
 		String response = sendQuery(emptyQuery);
+		closeConnection();
 		WSProjectInfo projectInfo = new WSProjectInfo();
 		projectInfo.encodeData(response);
 		return projectInfo;
@@ -62,6 +63,7 @@ public class IhcControllerService extends IhcHttpsClient {
 		openConnection(url);
 		setRequestProperty("SOAPAction", "getIHCProjectNumberOfSegments");
 		String response = sendQuery(emptyQuery);
+		closeConnection();
 
 		String numberOfSegments = WSBaseDataType.parseValue(response,
 				"/SOAP-ENV:Envelope/SOAP-ENV:Body/ns1:getIHCProjectNumberOfSegments1");
@@ -79,6 +81,7 @@ public class IhcControllerService extends IhcHttpsClient {
 		openConnection(url);
 		setRequestProperty("SOAPAction", "getIHCProjectSegmentationSize");
 		String response = sendQuery(emptyQuery);
+		closeConnection();
 
 		String segmentationSize = WSBaseDataType.parseValue(response,
 				"/SOAP-ENV:Envelope/SOAP-ENV:Body/ns1:getIHCProjectSegmentationSize1");
@@ -114,6 +117,7 @@ public class IhcControllerService extends IhcHttpsClient {
 		openConnection(url);
 		setRequestProperty("SOAPAction", "getIHCProjectSegment");
 		String response = sendQuery(query);
+		closeConnection();
 		WSFile file = new WSFile();
 		file.encodeData(response);
 		return file;
@@ -130,6 +134,7 @@ public class IhcControllerService extends IhcHttpsClient {
 		openConnection(url);
 		setRequestProperty("SOAPAction", "getState");
 		String response = sendQuery(emptyQuery);
+		closeConnection();
 		WSControllerState controllerState = new WSControllerState();
 		controllerState.encodeData(response);
 		return controllerState;
@@ -162,8 +167,9 @@ public class IhcControllerService extends IhcHttpsClient {
 		String query = String.format(soapQuery, previousState.getState(), timeoutInSeconds);
 		openConnection(url);
 		setRequestProperty("SOAPAction", "waitForControllerStateChange");
-		setTimeout(getTimeout() + timeoutInSeconds * 1000);
+		setRequestTimeout(getRequestTimeout() + timeoutInSeconds * 1000);
 		String response = sendQuery(query);
+		closeConnection();
 		WSControllerState controllerState = new WSControllerState();
 		controllerState.encodeData(response);
 		return controllerState;

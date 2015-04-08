@@ -217,11 +217,11 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			for (IhcBindingProvider provider : providers) {
 				for (String itemName : provider.getItemNames()) {
 
-					int resourceId = provider.getResourceId(itemName, null);
+					int resourceId = provider.getResourceIdForInBinding(itemName);
 					int itemRefreshInterval = provider
 							.getRefreshInterval(itemName) * 1000;
 
-					if (itemRefreshInterval > 0) {
+					if (resourceId > 0 && itemRefreshInterval > 0) {
 
 						Long lastUpdateTimeStamp = lastUpdateMap.get(itemName);
 						if (lastUpdateTimeStamp == null) {
@@ -362,7 +362,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	/**
 	 * Update resource value to IHC controller.
 	 */
-	private void updateResource(String itemName, Type type, boolean updateOnlyOutBinding) {
+	private void updateResource(String itemName, Type type, boolean updateOnlyExclusiveOutBinding) {
 		
 		if (itemName != null) {
 			Command cmd = null;
@@ -376,8 +376,8 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 				//command not configured, skip
 				return;
 			}
-
-			if (updateOnlyOutBinding && provider.isOutBindingOnly(itemName) == false) {
+			
+			if (updateOnlyExclusiveOutBinding && provider.hasInBinding(itemName)) {
 				logger.trace("Ignore in binding update for item '{}'", itemName);
 				return;
 			}
@@ -398,14 +398,14 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			}
 			
 			try {
-
 				int resourceId = provider.getResourceId(itemName, (Command)type);
+				
 				logger.trace(
 						"found resourceId {} (item='{}', state='{}', class='{}')",
 						new Object[] { new Integer(resourceId).toString(), itemName, type.toString(),
 								type.getClass().toString() });
-				if(resourceId > 0) {
 				
+				if(resourceId > 0) {
 					WSResourceValue value = ihc
 							.getResourceValueInformation(resourceId);
 					
@@ -417,6 +417,9 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 								.getDefinitionTypeID());
 					}
 	
+					// check if configuration has a custom value defined (0->OFF, 1->ON, >1->trigger)
+					// if that is the case, the type will be overridden with a new type
+					
 					Integer val = provider.getValue(itemName, (Command)type);
 					boolean trigger = false;
 					if(val != null) {
@@ -427,6 +430,8 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 						} else {
 							trigger = true;
 						}
+					} else {
+						// the original type is kept
 					}
 					
 					if (!trigger) {
@@ -539,7 +544,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 		if (ihc != null) {
 			
 			if (ihc.getConnectionState() != ConnectionState.CONNECTED) {
-				logger.debug("Controller is connecting, abort subscripe");
+				logger.debug("Controller is connecting, abort subscribe");
 				return;
 			}
 			
@@ -547,7 +552,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			
 			for (IhcBindingProvider provider : providers) {
 				for (String itemName : provider.getItemNames()) {
-					resourceIdList.add(provider.getResourceId(itemName, null));
+					resourceIdList.add(provider.getResourceIdForInBinding(itemName));
 				}
 			}
 
@@ -603,14 +608,14 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 		for (IhcBindingProvider provider : providers) {
 			for (String itemName : provider.getItemNames()) {
 
-				int resourceId = provider.getResourceId(itemName, null);
+				int resourceId = provider.getResourceIdForInBinding(itemName);
 
 				if (value.getResourceID() == resourceId) {
 
-					if (provider.isOutBindingOnly(itemName)) {
+					if (!provider.hasInBinding(itemName)) {
 
 						logger.trace(
-								"{} is out binding only...skip update to OpenHAB bus",
+								"{} has no inbinding...skip update to OpenHAB bus",
 								itemName);
 
 					} else {

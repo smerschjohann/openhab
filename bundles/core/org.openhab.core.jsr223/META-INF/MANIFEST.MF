@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
-Bundle-ClassPath: .,lib/jython.jar
+Bundle-ClassPath: .
 Bundle-ManifestVersion: 2
 Bundle-Name: openHAB Jsr223 core
 Bundle-Vendor: openHAB.org

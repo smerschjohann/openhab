@@ -34,7 +34,7 @@ public class IhcAuthenticationService extends IhcHttpsClient {
 
 	IhcAuthenticationService(String host, int timeout) {
 		this(host);
-		super.setTimeout(timeout);
+		super.setRequestTimeout(timeout);
 	}
 	
 	public WSLoginResult authenticate(String username, String password, String application) throws IhcExecption {

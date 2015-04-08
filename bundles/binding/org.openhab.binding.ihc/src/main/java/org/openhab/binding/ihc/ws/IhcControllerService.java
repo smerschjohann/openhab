@@ -8,8 +8,6 @@
  */
 package org.openhab.binding.ihc.ws;
 
-import java.util.List;
-
 import org.openhab.binding.ihc.ws.datatypes.WSBaseDataType;
 import org.openhab.binding.ihc.ws.datatypes.WSControllerState;
 import org.openhab.binding.ihc.ws.datatypes.WSFile;
@@ -33,14 +31,9 @@ public class IhcControllerService extends IhcHttpsClient {
 			+ "</soapenv:Envelope>";
 
 	private String url;
-	List<String> cookies;
 	
 	IhcControllerService(String host) {
 		url = "https://" + host + "/ws/ControllerService";
-	}
-
-	public void setCookies(List<String> cookies) {
-		this.cookies = cookies;
 	}
 
 	/**
@@ -52,7 +45,6 @@ public class IhcControllerService extends IhcHttpsClient {
 	public synchronized WSProjectInfo getProjectInfo() throws IhcExecption {
 		
 		openConnection(url);
-		super.setCookies(cookies);
 		setRequestProperty("SOAPAction", "getProjectInfo");
 		String response = sendQuery(emptyQuery);
 		closeConnection();
@@ -69,14 +61,13 @@ public class IhcControllerService extends IhcHttpsClient {
 	public synchronized int getProjectNumberOfSegments() throws IhcExecption {
 		
 		openConnection(url);
-		super.setCookies(cookies);
 		setRequestProperty("SOAPAction", "getIHCProjectNumberOfSegments");
 		String response = sendQuery(emptyQuery);
+		closeConnection();
 
 		String numberOfSegments = WSBaseDataType.parseValue(response,
 				"/SOAP-ENV:Envelope/SOAP-ENV:Body/ns1:getIHCProjectNumberOfSegments1");
 
-		closeConnection();
 		return Integer.parseInt(numberOfSegments);
 	}
 
@@ -88,14 +79,13 @@ public class IhcControllerService extends IhcHttpsClient {
 	public synchronized int getProjectSegmentationSize() throws IhcExecption {
 		
 		openConnection(url);
-		super.setCookies(cookies);
 		setRequestProperty("SOAPAction", "getIHCProjectSegmentationSize");
 		String response = sendQuery(emptyQuery);
+		closeConnection();
 
 		String segmentationSize = WSBaseDataType.parseValue(response,
 				"/SOAP-ENV:Envelope/SOAP-ENV:Body/ns1:getIHCProjectSegmentationSize1");
 
-		closeConnection();
 		return Integer.parseInt(segmentationSize);
 	}
 
@@ -125,7 +115,6 @@ public class IhcControllerService extends IhcHttpsClient {
 
 		String query = String.format(soapQuery, index, major, minor);
 		openConnection(url);
-		super.setCookies(cookies);
 		setRequestProperty("SOAPAction", "getIHCProjectSegment");
 		String response = sendQuery(query);
 		closeConnection();
@@ -143,9 +132,9 @@ public class IhcControllerService extends IhcHttpsClient {
 			throws IhcExecption {
 		
 		openConnection(url);
-		super.setCookies(cookies);
 		setRequestProperty("SOAPAction", "getState");
 		String response = sendQuery(emptyQuery);
+		closeConnection();
 		WSControllerState controllerState = new WSControllerState();
 		controllerState.encodeData(response);
 		return controllerState;
@@ -177,9 +166,8 @@ public class IhcControllerService extends IhcHttpsClient {
 
 		String query = String.format(soapQuery, previousState.getState(), timeoutInSeconds);
 		openConnection(url);
-		super.setCookies(cookies);
 		setRequestProperty("SOAPAction", "waitForControllerStateChange");
-		setTimeout(getTimeout() + timeoutInSeconds * 1000);
+		setRequestTimeout(getRequestTimeout() + timeoutInSeconds * 1000);
 		String response = sendQuery(query);
 		closeConnection();
 		WSControllerState controllerState = new WSControllerState();

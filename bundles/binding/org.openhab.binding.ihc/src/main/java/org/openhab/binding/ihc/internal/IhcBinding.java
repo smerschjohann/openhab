@@ -46,13 +46,14 @@ import org.slf4j.LoggerFactory;
  * Binding also polls resources from controller where interval is configured.
  * 
  * @author Pauli Anttila
+ * @author Simon Merschjohann
  * @since 1.1.0
  */
 public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 		implements ManagedService, IhcEventListener, BindingChangeListener {
 
-	private static final Logger logger = 
-		LoggerFactory.getLogger(IhcBinding.class);
+	private static final Logger logger = LoggerFactory
+			.getLogger(IhcBinding.class);
 
 	private long refreshInterval = 1000;
 
@@ -79,18 +80,19 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	 * download from controller
 	 */
 	private static String projectFile = null;
-	
+
 	/** Path for resource's dump. Dump is useful to find out resource id's. */
 	private static String dumpResourceFile = null;
 
 	/** Timeout for controller communication */
 	private static int timeout = 5000;
 
-	/** Store current state of the controller, use to recognize when
-	 * controller state is changed
+	/**
+	 * Store current state of the controller, use to recognize when controller
+	 * state is changed
 	 */
 	private WSControllerState controllerState = null;
-	
+
 	/**
 	 * Reminder to slow down resource value notification ordering from
 	 * controller.
@@ -98,7 +100,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	private NotificationsRequestReminder reminder = null;
 	private boolean reconnectRequest = false;
 	private boolean valueNotificationRequest = false;
-	
+
 	@Override
 	protected String getName() {
 		return "IHC / ELKO LS refresh and notification listener service";
@@ -115,28 +117,28 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	public void deactivate(ComponentContext componentContext) {
 		disconnect();
 	}
-	
+
 	protected boolean isReconnectRequestActivated() {
 		synchronized (IhcBinding.class) {
 			return reconnectRequest;
-		}		
+		}
 	}
 
 	protected void setReconnectRequest(boolean reconnect) {
 		synchronized (IhcBinding.class) {
 			this.reconnectRequest = reconnect;
-		}	
+		}
 	}
 
 	protected boolean isValueNotificationRequestActivated() {
 		synchronized (IhcBinding.class) {
-			return valueNotificationRequest;	
+			return valueNotificationRequest;
 		}
 	}
 
 	protected void setValueNotificationRequest(boolean valueNotificationRequest) {
 		synchronized (IhcBinding.class) {
-			this.valueNotificationRequest = valueNotificationRequest;	
+			this.valueNotificationRequest = valueNotificationRequest;
 		}
 	}
 
@@ -145,7 +147,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	 * 
 	 */
 	public void connect() throws IhcExecption {
-		
+
 		if (StringUtils.isNotBlank(ip) && StringUtils.isNotBlank(username)
 				&& StringUtils.isNotBlank(password)) {
 
@@ -159,14 +161,14 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			ihc.openConnection();
 			controllerState = ihc.getControllerState();
 			ihc.addEventListener(this);
-			
+
 		} else {
 			logger.warn(
 					"Couldn't connect to IHC controller because of missing connection parameters [IP='{}' Username='{}' Password='{}'].",
 					new Object[] { ip, username, "******" });
 		}
 	}
-	
+
 	/**
 	 * Disconnect connection to IHC / ELKO LS controller.
 	 * 
@@ -202,22 +204,25 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 				return;
 			}
 		}
-	
+
 		if (ihc != null) {
-			
+
 			if (isValueNotificationRequestActivated()) {
 				try {
 					enableResourceValueNotifications();
 				} catch (IhcExecption e) {
-					logger.warn("Can't enable resource value notifications from controller", e);
-				}	
+					logger.warn(
+							"Can't enable resource value notifications from controller",
+							e);
+				}
 			}
-			
+
 			// Poll all requested resources from controller
 			for (IhcBindingProvider provider : providers) {
 				for (String itemName : provider.getItemNames()) {
-
-					int resourceId = provider.getResourceIdForInBinding(itemName);
+					
+					int resourceId = provider
+							.getResourceIdForInBinding(itemName);
 					int itemRefreshInterval = provider
 							.getRefreshInterval(itemName) * 1000;
 
@@ -233,7 +238,6 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 						boolean needsUpdate = age >= itemRefreshInterval;
 
 						if (needsUpdate) {
-
 							logger.debug(
 									"Item '{}' is about to be refreshed now",
 									itemName);
@@ -242,12 +246,16 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 								WSResourceValue resourceValue = null;
 
 								try {
-									resourceValue = ihc.resourceQuery(resourceId);
+									resourceValue = ihc
+											.resourceQuery(resourceId);
 								} catch (IhcExecption e) {
-									logger.warn("Value could not be read from controller - retrying one time.", e);
+									logger.warn(
+											"Value could not be read from controller - retrying one time.",
+											e);
 
 									try {
-										resourceValue = ihc.resourceQuery(resourceId);
+										resourceValue = ihc
+												.resourceQuery(resourceId);
 									} catch (IhcExecption ex) {
 										logger.error("Communication error", ex);
 										logger.debug("Reconnection request");
@@ -265,7 +273,9 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 								}
 
 							} catch (Exception e) {
-								logger.error("Error occured during resource query", e);
+								logger.error(
+										"Error occured during resource query",
+										e);
 							}
 
 							lastUpdateMap.put(itemName,
@@ -279,7 +289,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 		}
 
 	}
-	
+
 	/**
 	 * {@inheritDoc}
 	 */
@@ -296,39 +306,40 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	@Override
 	public void bindingChanged(BindingProvider provider, String itemName) {
 		logger.trace("bindingChanged {}", itemName);
-		if( reminder != null) {
+		if (reminder != null) {
 			reminder.cancel();
 			reminder = null;
 		}
-		
-		reminder = new NotificationsRequestReminder(NOTIFICATIONS_REORDER_WAIT_TIME);
+
+		reminder = new NotificationsRequestReminder(
+				NOTIFICATIONS_REORDER_WAIT_TIME);
 	}
 
 	/**
-	 * Used to slow down resource value notification ordering process.
-	 * All resource values need to be ordered by one request from the controller,
-	 * therefore wait that all binding items are loaded. 
+	 * Used to slow down resource value notification ordering process. All
+	 * resource values need to be ordered by one request from the controller,
+	 * therefore wait that all binding items are loaded.
 	 */
 	private class NotificationsRequestReminder {
-	    Timer timer;
+		Timer timer;
 
-	    public NotificationsRequestReminder(int milliseconds) {
-	        timer = new Timer();
-	        timer.schedule(new RemindTask(), milliseconds);
+		public NotificationsRequestReminder(int milliseconds) {
+			timer = new Timer();
+			timer.schedule(new RemindTask(), milliseconds);
 		}
 
-	    public void cancel() {
-	    	timer.cancel();
-	    }
-	    
-	    class RemindTask extends TimerTask {
-	    	
-	        public void run() {
-	        	logger.debug("Timer: enableResourceValueNotifications");
-	        	setValueNotificationRequest(true);
-	            timer.cancel();
-	        }
-	    }
+		public void cancel() {
+			timer.cancel();
+		}
+
+		class RemindTask extends TimerTask {
+
+			public void run() {
+				logger.debug("Timer: enableResourceValueNotifications");
+				setValueNotificationRequest(true);
+				timer.cancel();
+			}
+		}
 	}
 
 	public void updated(Dictionary<String, ?> config)
@@ -353,7 +364,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	protected void internalReceiveCommand(String itemName, Command command) {
 		updateResource(itemName, command, false);
 	}
-	
+
 	@Override
 	public void internalReceiveUpdate(String itemName, State newState) {
 		updateResource(itemName, newState, true);
@@ -362,70 +373,82 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	/**
 	 * Update resource value to IHC controller.
 	 */
-	private void updateResource(String itemName, Type type, boolean updateOnlyExclusiveOutBinding) {
-		
+	private void updateResource(String itemName, Type type,
+			boolean updateOnlyExclusiveOutBinding) {
+
 		if (itemName != null) {
 			Command cmd = null;
 			try {
-				 cmd = (Command) type;
-			} catch(Exception e) {};
-			
-			IhcBindingProvider provider = findFirstMatchingBindingProvider(itemName, cmd);
+				cmd = (Command) type;
+			} catch (Exception e) {
+			}
+
+			IhcBindingProvider provider = findFirstMatchingBindingProvider(
+					itemName, cmd);
 
 			if (provider == null) {
-				//command not configured, skip
+				// command not configured, skip
 				return;
 			}
-			
-			if (updateOnlyExclusiveOutBinding && provider.hasInBinding(itemName)) {
+
+			if (updateOnlyExclusiveOutBinding
+					&& provider.hasInBinding(itemName)) {
 				logger.trace("Ignore in binding update for item '{}'", itemName);
 				return;
 			}
-			
+
 			logger.debug(
 					"Received update/command (item='{}', state='{}', class='{}')",
 					new Object[] { itemName, type.toString(),
 							type.getClass().toString() });
 
 			if (ihc == null) {
-				logger.warn("Controller is not initialized, abort resource value update for item '{}'!", itemName);
+				logger.warn(
+						"Controller is not initialized, abort resource value update for item '{}'!",
+						itemName);
 				return;
 			}
 
 			if (ihc.getConnectionState() != ConnectionState.CONNECTED) {
-				logger.warn("Connection to controller is not ok, abort resource value update for item '{}'!", itemName);
+				logger.warn(
+						"Connection to controller is not ok, abort resource value update for item '{}'!",
+						itemName);
 				return;
 			}
-			
+
 			try {
-				int resourceId = provider.getResourceId(itemName, (Command)type);
-				
+				int resourceId = provider.getResourceId(itemName,
+						(Command) type);
+
 				logger.trace(
 						"found resourceId {} (item='{}', state='{}', class='{}')",
-						new Object[] { new Integer(resourceId).toString(), itemName, type.toString(),
+						new Object[] { new Integer(resourceId).toString(),
+								itemName, type.toString(),
 								type.getClass().toString() });
-				
-				if(resourceId > 0) {
+
+				if (resourceId > 0) {
 					WSResourceValue value = ihc
 							.getResourceValueInformation(resourceId);
-					
+
 					ArrayList<IhcEnumValue> enumValues = null;
-	
+
 					if (value instanceof WSEnumValue) {
-	
+
 						enumValues = ihc.getEnumValues(((WSEnumValue) value)
 								.getDefinitionTypeID());
 					}
-	
-					// check if configuration has a custom value defined (0->OFF, 1->ON, >1->trigger)
-					// if that is the case, the type will be overridden with a new type
-					
-					Integer val = provider.getValue(itemName, (Command)type);
+
+					// check if configuration has a custom value defined
+					// (0->OFF, 1->ON, >1->trigger)
+					// if that is the case, the type will be overridden with a
+					// new type
+
+					Integer val = provider.getValue(itemName, (Command) type);
 					boolean trigger = false;
-					if(val != null) {
-						if(val == 0) {
+					if (val != null) {
+						if (val == 0) {
 							type = OnOffType.OFF;
-						} else if(val == 1) {
+						} else if (val == 1) {
 							type = OnOffType.ON;
 						} else {
 							trigger = true;
@@ -433,13 +456,13 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 					} else {
 						// the original type is kept
 					}
-					
+
 					if (!trigger) {
-						value = IhcDataConverter.convertCommandToResourceValue(type, value,
-								enumValues);
+						value = IhcDataConverter.convertCommandToResourceValue(
+								type, value, enumValues);
 
 						boolean result = updateResource(value);
-						
+
 						if (result == true) {
 							logger.debug("Item updated '{}' succesfully sent",
 									itemName);
@@ -447,52 +470,52 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 							logger.error("Item '{}' update failed", itemName);
 						}
 					} else {
-						value = IhcDataConverter.convertCommandToResourceValue(OnOffType.ON, value,
-								enumValues);
-		
+						value = IhcDataConverter.convertCommandToResourceValue(
+								OnOffType.ON, value, enumValues);
+
 						boolean result = updateResource(value);
-						
+
 						if (result == true) {
-							logger.debug("Item '{}' trigger started",
-									itemName);
-							
+							logger.debug("Item '{}' trigger started", itemName);
+
 							Thread.sleep(val);
-			
-							value = IhcDataConverter.convertCommandToResourceValue(OnOffType.OFF, value,
-									enumValues);
-			
+
+							value = IhcDataConverter
+									.convertCommandToResourceValue(
+											OnOffType.OFF, value, enumValues);
+
 							result = updateResource(value);
-							
+
 							if (result == true) {
 								logger.debug("Item '{}' trigger completed",
 										itemName);
 							} else {
-								logger.error("Item '{}' trigger stop failed", itemName);
+								logger.error("Item '{}' trigger stop failed",
+										itemName);
 							}
-							
+
 						} else {
 							logger.error("Item '{}' update failed", itemName);
 						}
 					}
-				
+
 				} else {
 					logger.error("resourceId invalid");
 				}
 
-			} catch ( IhcExecption e) {
+			} catch (IhcExecption e) {
 				logger.error("Can't update Item '{}' value ", itemName, e);
 			} catch (Exception e) {
 				logger.error("Error occured during item update", e);
 			}
 		}
-		
+
 	}
-	
+
 	/**
 	 * Update resource value to IHC controller.
 	 */
 	private boolean updateResource(WSResourceValue value) throws IhcExecption {
-		
 		boolean result = false;
 
 		try {
@@ -500,16 +523,15 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 
 		} catch (IhcExecption e) {
 
-			logger.warn(
-					"Value could not be set - retrying one time: {}",
+			logger.warn("Value could not be set - retrying one time: {}",
 					e.getMessage());
 
 			result = ihc.resourceUpdate(value);
 		}
-		
+
 		return result;
 	}
-	
+
 	/**
 	 * Find the first matching {@link IhcBindingProvider} according to
 	 * <code>itemName</code> and <code>command</code>.
@@ -519,12 +541,13 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 	 * @return the matching binding provider or <code>null</code> if no binding
 	 *         provider could be found
 	 */
-	private IhcBindingProvider findFirstMatchingBindingProvider(String itemName, Command type) {
+	private IhcBindingProvider findFirstMatchingBindingProvider(
+			String itemName, Command type) {
 		IhcBindingProvider firstMatchingProvider = null;
 
 		for (IhcBindingProvider provider : this.providers) {
-			if (provider.getResourceId(itemName, type) > 0 ||
-					provider.getResourceId(itemName, null) > 0) {
+			if (provider.getResourceId(itemName, type) > 0
+					|| provider.getResourceId(itemName, null) > 0) {
 				firstMatchingProvider = provider;
 				break;
 			}
@@ -533,26 +556,26 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 		return firstMatchingProvider;
 	}
 
-
 	/**
 	 * Order resource value notifications from IHC controller.
 	 */
 	private void enableResourceValueNotifications() throws IhcExecption {
-		
+
 		logger.debug("Subscripe resource runtime value notifications");
 
 		if (ihc != null) {
-			
+
 			if (ihc.getConnectionState() != ConnectionState.CONNECTED) {
 				logger.debug("Controller is connecting, abort subscribe");
 				return;
 			}
-			
+
 			List<Integer> resourceIdList = new ArrayList<Integer>();
-			
+
 			for (IhcBindingProvider provider : providers) {
 				for (String itemName : provider.getItemNames()) {
-					resourceIdList.add(provider.getResourceIdForInBinding(itemName));
+					resourceIdList.add(provider
+							.getResourceIdForInBinding(itemName));
 				}
 			}
 
@@ -572,25 +595,23 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 			logger.debug("Reconnection request");
 			setReconnectRequest(true);
 		}
-		
+
 		setValueNotificationRequest(false);
 	}
 
 	@Override
 	public void statusUpdateReceived(EventObject event, WSControllerState state) {
-		
+
 		logger.trace("Controller state {}", state.getState());
 
 		if (controllerState.getState().equals(state.getState()) == false) {
-			logger.info(
-					"Controller state change detected ({} -> {})",
-					controllerState.getState(),
-					state.getState());
+			logger.info("Controller state change detected ({} -> {})",
+					controllerState.getState(), state.getState());
 
 			if (controllerState.getState().equals(
 					IhcClient.CONTROLLER_STATE_INITIALIZE)
-					|| state.getState().equals(
-							IhcClient.CONTROLLER_STATE_READY)) {
+					|| state.getState()
+							.equals(IhcClient.CONTROLLER_STATE_READY)) {
 
 				logger.debug("Reconnection request");
 				setReconnectRequest(true);
@@ -598,7 +619,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 
 			controllerState.setState(state.getState());
 		}
-		
+
 	}
 
 	@Override
@@ -624,7 +645,7 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 								.getItemType(itemName);
 						State state = IhcDataConverter
 								.convertResourceValueToState(itemType, value);
-						
+
 						logger.trace(
 								"Received resource value update (item='{}', state='{}')",
 								new Object[] { itemName, state });
@@ -640,10 +661,9 @@ public class IhcBinding extends AbstractActiveBinding<IhcBindingProvider>
 
 	@Override
 	public void errorOccured(EventObject event, IhcExecption e) {
-		logger.warn(
-				"Error occured on communication to IHC controller: {}",
+		logger.warn("Error occured on communication to IHC controller: {}",
 				e.getMessage());
-				
+
 		logger.debug("Reconnection request");
 		setReconnectRequest(true);
 	}

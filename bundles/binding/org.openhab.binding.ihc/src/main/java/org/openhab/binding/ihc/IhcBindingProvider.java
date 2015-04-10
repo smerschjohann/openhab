@@ -20,6 +20,7 @@ import org.openhab.core.types.Command;
  * taken into account.
  * 
  * @author Pauli Anttila
+ * @author Simon Merschjohann
  * @since 1.1.0
  */
 public interface IhcBindingProvider extends BindingProvider {
@@ -27,30 +28,34 @@ public interface IhcBindingProvider extends BindingProvider {
 	/**
 	 * Returns the Type of the Item identified by {@code itemName}
 	 * 
-	 * @param itemName the name of the item to find the type for
+	 * @param itemName
+	 *            the name of the item to find the type for
 	 * @return the type of the Item identified by {@code itemName}
 	 */
 	Class<? extends Item> getItemType(String itemName);
-	
+
 	/**
-	 * Returns the resource id of the associated In-Binding to the given <code>itemName</code>
+	 * Returns the resource id of the associated In-Binding to the given
+	 * <code>itemName</code>
 	 * 
 	 * @param itemName
-	 * 			 the item for which to find a resource id.
-	 * @return the corresponding Resource Id of the In-Binding to the given <code>itemName</code>.
+	 *            the item for which to find a resource id.
+	 * @return the corresponding Resource Id of the In-Binding to the given
+	 *         <code>itemName</code>.
 	 */
 	public int getResourceIdForInBinding(String itemName);
-	
+
 	/**
-	 * Returns the resource id to the given <code>itemName</code> and <code>cmd</code>
+	 * Returns the resource id to the given <code>itemName</code> and
+	 * <code>cmd</code>
 	 * 
 	 * @param itemName
 	 *            the item for which to find a resource id.
 	 * @param cmd
-	 * 			  the wanted command, choose null for wildcard.
+	 *            the wanted command, choose null for wildcard.
 	 * 
 	 * @return the corresponding Resource Id to the given <code>itemName</code>.
-	 */	
+	 */
 	public int getResourceId(String itemName, Command cmd);
 
 	/**
@@ -66,26 +71,28 @@ public interface IhcBindingProvider extends BindingProvider {
 	public int getRefreshInterval(String itemName);
 
 	/**
-	 * Returns item binding mode to the given <code>itemName</code> and <code>resourceId</code>.
+	 * Returns item binding mode to the given <code>itemName</code> and
+	 * <code>resourceId</code>.
 	 * 
 	 * @param itemName
 	 *            the item for which to find a binding mode.
-	 *            
+	 * 
 	 * @param resourceId
-	 *            the resourceId to be checked.     
+	 *            the resourceId to be checked.
 	 * 
 	 * @return true if given resource is an out binding.
 	 */
 	public boolean isOutBinding(String itemName, int resourceId);
-	
+
 	/**
-	 * Returns true if there exists an In-Binding ( "<0x1234" or "0x1234" ) for the given Item
+	 * Returns true if there exists an In-Binding ( "<0x1234" or "0x1234" ) for
+	 * the given Item
 	 * 
 	 * @param itemName
 	 * @return true if item has in binding
 	 */
 	public boolean hasInBinding(String itemName);
-	
+
 	/**
 	 * Returns the value which is configured for the given item and the command
 	 * 
